@@ -1,12 +1,18 @@
 {
  "version": 1,
- "updated": "2026-11-09T18:10:56+08:00",
+ "updated": "2026-11-09T18:16:10+08:00",
  "timezone": "Asia/Shanghai",
  "sources": {
   "cwl": "https://www.cwl.gov.cn/",
   "sporttery": "https://www.sporttery.cn/"
  },
- "errors": [],
+ "errors": [
+  "ssq: 请求失败：https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=150&pageNo=1&pageSize=150",
+  "dlt: 请求失败：https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry?gameNo=85&provinceId=0&pageSize=100&isVerify=1&pageNo=1",
+  "fc3d: 请求失败：https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=3d&issueCount=150&pageNo=1&pageSize=150",
+  "p5: 请求失败：https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry?gameNo=350133&provinceId=0&pageSize=100&isVerify=1&pageNo=1",
+  "kl8: 请求失败：https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=kl8&issueCount=150&pageNo=1&pageSize=150"
+ ],
  "games": {
   "ssq": {
    "name": "双色球",
