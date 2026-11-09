@@ -320,7 +320,7 @@
       '<div class="card-head"><div class="card-title"><span class="icon">ⓘ</span>关于与说明</div><span class="badge gray">v1.0.0</span></div>' +
       '<ul class="about-list">' +
       '<li><span class="bullet">↻</span><div><b>自动刷新</b>：打开页面后每 60 秒检查一次开奖数据，开奖后自动更新；推荐号码每 5 分钟自动换一注。</div></li>' +
-      '<li><span class="bullet">↗</span><div><b>数据来源</b>：<a href="https://www.cwl.gov.cn/" target="_blank" rel="noopener">中国福利彩票</a>、<a href="https://www.sporttery.cn/" target="_blank" rel="noopener">中国体育彩票</a>官方公开接口，由 GitHub Actions 每 10 分钟同步。</div></li>' +
+      '<li><span class="bullet">↗</span><div><b>数据来源</b>：<a href="https://www.cwl.gov.cn/" target="_blank" rel="noopener">中国福利彩票</a>、<a href="https://www.sporttery.cn/" target="_blank" rel="noopener">中国体育彩票</a>官方公开接口；海外 Runner 自动回退到 500.com 公开历史页。GitHub Actions 每 10 分钟同步。</div></li>' +
       '<li><span class="bullet">∑</span><div><b>推荐算法</b>：统计近 30 / 100 期号码频率与近期热度并加入随机扰动，同时约束奇偶、大小、区间和和值形态。任何模型都不能预测开奖结果。</div></li>' +
       '<li><span class="bullet">＋</span><div><b>装到桌面</b>：iPhone 用 Safari 打开 → 点底部「分享」→「添加到主屏幕」，即可全屏使用并支持离线缓存。</div></li>' +
       "</ul>" +
