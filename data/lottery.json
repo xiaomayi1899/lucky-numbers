@@ -1,18 +1,13 @@
 {
  "version": 1,
- "updated": "2026-11-09T18:16:10+08:00",
+ "updated": "2026-11-09T18:21:55+08:00",
  "timezone": "Asia/Shanghai",
  "sources": {
   "cwl": "https://www.cwl.gov.cn/",
-  "sporttery": "https://www.sporttery.cn/"
+  "sporttery": "https://www.sporttery.cn/",
+  "500": "https://datachart.500.com/"
  },
- "errors": [
-  "ssq: 请求失败：https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=150&pageNo=1&pageSize=150",
-  "dlt: 请求失败：https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry?gameNo=85&provinceId=0&pageSize=100&isVerify=1&pageNo=1",
-  "fc3d: 请求失败：https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=3d&issueCount=150&pageNo=1&pageSize=150",
-  "p5: 请求失败：https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry?gameNo=350133&provinceId=0&pageSize=100&isVerify=1&pageNo=1",
-  "kl8: 请求失败：https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=kl8&issueCount=150&pageNo=1&pageSize=150"
- ],
+ "errors": [],
  "games": {
   "ssq": {
    "name": "双色球",
@@ -2417,7 +2412,8 @@
      ],
      "pool": 2776600809
     }
-   ]
+   ],
+   "source": "500"
   },
   "dlt": {
    "name": "大乐透",
@@ -2436,7 +2432,7 @@
       3,
       12
      ],
-     "pool": 762911586
+     "pool": 762911587
     },
     {
      "issue": "26126",
@@ -2484,7 +2480,7 @@
       1,
       9
      ],
-     "pool": 750797513
+     "pool": 750797514
     },
     {
      "issue": "26123",
@@ -2548,7 +2544,7 @@
       3,
       4
      ],
-     "pool": 825893883
+     "pool": 825893884
     },
     {
      "issue": "26119",
@@ -2564,7 +2560,7 @@
       4,
       7
      ],
-     "pool": 824436634
+     "pool": 824436635
     },
     {
      "issue": "26118",
@@ -2644,7 +2640,7 @@
       9,
       12
      ],
-     "pool": 747810333
+     "pool": 747810334
     },
     {
      "issue": "26113",
@@ -2660,7 +2656,7 @@
       1,
       10
      ],
-     "pool": 733622133
+     "pool": 733622134
     },
     {
      "issue": "26112",
@@ -2676,7 +2672,7 @@
       3,
       9
      ],
-     "pool": 798649740
+     "pool": 798649741
     },
     {
      "issue": "26111",
@@ -2772,7 +2768,7 @@
       4,
       6
      ],
-     "pool": 826970066
+     "pool": 826970067
     },
     {
      "issue": "26105",
@@ -2788,7 +2784,7 @@
       9,
       12
      ],
-     "pool": 797986461
+     "pool": 797986462
     },
     {
      "issue": "26104",
@@ -2804,7 +2800,7 @@
       8,
       9
      ],
-     "pool": 768328090
+     "pool": 768328091
     },
     {
      "issue": "26103",
@@ -2852,7 +2848,7 @@
       9,
       11
      ],
-     "pool": 692723356
+     "pool": 692723357
     },
     {
      "issue": "26100",
@@ -2884,7 +2880,7 @@
       8,
       9
      ],
-     "pool": 728556727
+     "pool": 728556728
     },
     {
      "issue": "26098",
@@ -2900,7 +2896,7 @@
       2,
       9
      ],
-     "pool": 706544163
+     "pool": 706544164
     },
     {
      "issue": "26097",
@@ -4822,7 +4818,8 @@
      ],
      "pool": 806116343
     }
-   ]
+   ],
+   "source": "500"
   },
   "fc3d": {
    "name": "福彩3D",
@@ -6177,7 +6174,8 @@
       6
      ]
     }
-   ]
+   ],
+   "source": "500"
   },
   "p5": {
    "name": "排列5",
@@ -7832,7 +7830,8 @@
       3
      ]
     }
-   ]
+   ],
+   "source": "500"
   },
   "kl8": {
    "name": "快乐8",
@@ -11737,7 +11736,8 @@
       77
      ]
     }
-   ]
+   ],
+   "source": "500"
   }
  }
 }

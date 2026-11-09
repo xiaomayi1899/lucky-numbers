@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """抓取五种数字彩的官方开奖数据，合并写入 data/lottery.json。
 
-数据源（均为官方公开接口）：
+数据源（优先官方公开接口，海外网络不可用时回退到 500.com）：
   福彩：双色球 ssq / 福彩3D 3d / 快乐8 kl8  ->  www.cwl.gov.cn
   体彩：大乐透 dlt / 排列5 p5               ->  webapi.sporttery.cn
+  备用：https://datachart.500.com/         ->  GitHub Actions 海外环境使用
 
 脚本只使用 Python 标准库，可在 GitHub Actions 中直接运行。
 """
 from __future__ import annotations
 
+import html as html_lib
 import json
+import os
+import re
 import sys
 import time
 import urllib.error
@@ -21,6 +25,8 @@ ROOT = Path(__file__).resolve().parent.parent
 DATA_FILE = ROOT / "data" / "lottery.json"
 MAX_DRAWS = 150
 CST = timezone(timedelta(hours=8))
+FIVE_HUNDRED = "https://datachart.500.com"
+SOURCE_MODE = os.environ.get("LOTTERY_SOURCE", "auto").strip().lower()
 
 # Windows 控制台默认 GBK，统一改为 UTF-8，避免中文/符号输出报错
 for stream in (sys.stdout, sys.stderr):
@@ -84,6 +90,31 @@ def sporttery_headers() -> dict[str, str]:
         "Accept": "application/json, text/plain, */*",
         "Accept-Language": "zh-CN,zh;q=0.9",
     }
+
+
+def five_headers() -> dict[str, str]:
+    return {
+        "User-Agent": UA_DESKTOP,
+        "Referer": "https://datachart.500.com/",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "zh-CN,zh;q=0.9",
+    }
+
+
+def http_text(url: str, headers: dict[str, str], retries: int = 3, timeout: int = 25) -> str:
+    last_err = None
+    for attempt in range(1, retries + 1):
+        try:
+            req = urllib.request.Request(url, headers=headers)
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                raw = resp.read()
+            return raw.decode("gb18030", errors="replace")
+        except Exception as exc:  # noqa: BLE001
+            last_err = exc
+            log(f"  ! 请求失败（{attempt}/{retries}）：{exc}")
+            if attempt < retries:
+                time.sleep(2 * attempt)
+    raise RuntimeError(f"请求失败：{url}") from last_err
 
 
 def fetch_cwl(game_id: str) -> list[dict]:
@@ -194,6 +225,151 @@ def fetch_sporttery(game_id: str) -> list[dict]:
     return draws
 
 
+# ---------------- 500.com 备用数据源 ----------------
+# GitHub Actions 的海外服务器通常无法访问福彩/体彩官方接口，
+# 因此增加 500.com 的公开历史数据页作为兜底。
+
+TD_RE = re.compile(r"<td([^>]*)>(.*?)</td>", re.I | re.S)
+TR_RE = re.compile(r"<tr[^>]*>(.*?)</tr>", re.I | re.S)
+CLASS_RE = re.compile(r'class="([^"]*)"', re.I)
+DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+ISSUE_RE = re.compile(r"\d{5,7}")
+
+
+def parse_cells(row: str) -> list[dict]:
+    cells = []
+    for attrs, inner in TD_RE.findall(row):
+        text = html_lib.unescape(re.sub(r"<[^>]+>", "", inner))
+        text = text.replace("\xa0", " ").strip()
+        cls = CLASS_RE.search(attrs)
+        cells.append({"class": cls.group(1) if cls else "", "text": text})
+    return cells
+
+
+def normalize_issue(game_id: str, issue: str) -> str:
+    issue = issue.strip()
+    # 500.com 双色球期号为 5 位（26128），官方接口为 7 位（2026128）
+    if game_id == "ssq" and re.fullmatch(r"\d{5}", issue):
+        return "20" + issue
+    return issue
+
+
+def parse_date(cells: list[dict]) -> str:
+    for cell in cells:
+        if DATE_RE.fullmatch(cell["text"]):
+            return cell["text"]
+    return ""
+
+
+def fill_missing_dates(draws: list[dict], existing: list[dict]) -> None:
+    known = {str(d.get("issue")): d.get("date", "") for d in existing if d.get("date")}
+    for draw in draws:
+        if not draw.get("date") and known.get(str(draw["issue"])):
+            draw["date"] = known[str(draw["issue"])]
+
+    anchors = [d for d in list(existing) + list(draws) if d.get("date")]
+    if not anchors:
+        return
+    anchors.sort(key=issue_key, reverse=True)
+    base = anchors[0]
+    try:
+        base_date = datetime.fromisoformat(str(base["date"])).date()
+    except ValueError:
+        return
+    for draw in draws:
+        if draw.get("date"):
+            continue
+        delta = issue_key(draw) - issue_key(base)
+        if -60 <= delta <= 60:
+            draw["date"] = (base_date + timedelta(days=delta)).isoformat()
+
+
+def fetch_500(game_id: str, existing: list[dict]) -> list[dict]:
+    if game_id in ("ssq", "dlt"):
+        path = "ssq" if game_id == "ssq" else "dlt"
+        url = f"{FIVE_HUNDRED}/{path}/history/newinc/history.php"
+    else:
+        path = {"fc3d": "sd", "p5": "plw", "kl8": "kl8"}[game_id]
+        page = "jbzs_redblue.shtml" if game_id == "kl8" else "jbzs.shtml"
+        url = f"{FIVE_HUNDRED}/{path}/zoushi/{page}?expect=100"
+
+    html = http_text(url, five_headers())
+    draws: dict[str, dict] = {}
+
+    for row in TR_RE.findall(html):
+        cells = parse_cells(row)
+        if len(cells) < 3:
+            continue
+        texts = [c["text"] for c in cells]
+
+        if game_id in ("ssq", "dlt"):
+            if len(texts) < 9:
+                continue
+            issue = normalize_issue(game_id, texts[1])
+            if not ISSUE_RE.fullmatch(issue):
+                continue
+            main = [int(c["text"]) for c in cells if "cfont2" in c["class"] and c["text"].isdigit()]
+            special = [int(c["text"]) for c in cells if "cfont4" in c["class"] and c["text"].isdigit()]
+            try:
+                if game_id == "ssq":
+                    if len(main) != 6 or len(special) < 1:
+                        continue
+                    if not all(1 <= n <= 33 for n in main) or not (1 <= special[0] <= 16):
+                        continue
+                    draw = {"issue": issue, "date": parse_date(cells), "red": sorted(main), "blue": [special[0]]}
+                    pool_idx = 10
+                else:
+                    if len(main) != 5 or len(special) != 2:
+                        continue
+                    if not all(1 <= n <= 35 for n in main) or not all(1 <= n <= 12 for n in special):
+                        continue
+                    draw = {"issue": issue, "date": parse_date(cells), "front": main, "back": special}
+                    pool_idx = 9
+                if len(texts) > pool_idx:
+                    pool = texts[pool_idx].replace(",", "")
+                    if pool.isdigit() and int(pool) > 0:
+                        draw["pool"] = int(pool)
+            except ValueError:
+                continue
+            draws[issue] = draw
+            continue
+
+        issue = ""
+        for idx in (0, 1):
+            if len(texts) > idx and ISSUE_RE.fullmatch(texts[idx]):
+                issue = texts[idx]
+                break
+        if not issue:
+            continue
+        balls = [int(c["text"]) for c in cells if "chartBall" in c["class"] and c["text"].isdigit()]
+        try:
+            if game_id == "fc3d":
+                if len(balls) < 3 or not all(0 <= n <= 9 for n in balls[:3]):
+                    continue
+                draw = {"issue": issue, "date": parse_date(cells), "digits": balls[:3]}
+            elif game_id == "p5":
+                if len(balls) < 5 or not all(0 <= n <= 9 for n in balls[:5]):
+                    continue
+                draw = {"issue": issue, "date": parse_date(cells), "digits": balls[:5]}
+            elif game_id == "kl8":
+                nums = sorted(balls[:20])
+                if len(nums) != 20 or len(set(nums)) != 20 or not all(1 <= n <= 80 for n in nums):
+                    continue
+                draw = {"issue": issue, "date": parse_date(cells), "nums": nums}
+            else:
+                continue
+        except ValueError:
+            continue
+        draws[issue] = draw
+
+    if not draws:
+        raise RuntimeError(f"{game_id}: 500.com 备用源返回空数据")
+
+    result = sorted(draws.values(), key=issue_key, reverse=True)
+    fill_missing_dates(result, existing)
+    return result
+
+
 def issue_key(draw: dict) -> int:
     issue = str(draw.get("issue", ""))
     digits = "".join(ch for ch in issue if ch.isdigit())
@@ -234,22 +410,46 @@ def main() -> int:
 
     for game_id, meta in GAME_META.items():
         log(f"→ 抓取 {meta['name']}（{game_id}）…")
-        try:
-            if meta["source"] == "cwl":
-                incoming = fetch_cwl(game_id)
-            else:
-                incoming = fetch_sporttery(game_id)
-            old = (old_games.get(game_id) or {}).get("draws") or []
-            merged = merge(old, incoming)
-            games[game_id] = {"name": meta["name"], "draws": merged}
-            ok_count += 1
-            log(f"  ✓ {len(incoming)} 条，合并后 {len(merged)} 条，最新 {merged[0]['issue']} {merged[0]['date']}")
-        except Exception as exc:  # noqa: BLE001
-            errors.append(f"{game_id}: {exc}")
-            log(f"  × {exc}")
-            if game_id in old_games:
-                games[game_id] = old_games[game_id]
+        old = (old_games.get(game_id) or {}).get("draws") or []
+        incoming = None
+        source_used = ""
+        failures: list[str] = []
+
+        if SOURCE_MODE in ("auto", "official"):
+            try:
+                if meta["source"] == "cwl":
+                    incoming = fetch_cwl(game_id)
+                else:
+                    incoming = fetch_sporttery(game_id)
+                source_used = "official"
+            except Exception as exc:  # noqa: BLE001
+                failures.append(f"official: {exc}")
+                log(f"  ! 官方源失败：{exc}")
+
+        if incoming is None and SOURCE_MODE in ("auto", "500"):
+            try:
+                incoming = fetch_500(game_id, old)
+                source_used = "500"
+                log("  ✓ 500.com 备用源成功")
+            except Exception as exc:  # noqa: BLE001
+                failures.append(f"500: {exc}")
+                log(f"  ! 500.com 备用源失败：{exc}")
+
+        if incoming is None:
+            errors.append(f"{game_id}: " + " | ".join(failures))
+            if old:
+                keep = dict(old_games.get(game_id) or {})
+                keep.setdefault("name", meta["name"])
+                keep.setdefault("source", "cache")
+                games[game_id] = keep
                 log("  · 保留上次成功抓取的数据")
+            continue
+
+        merged = merge(old, incoming)
+        games[game_id] = {"name": meta["name"], "draws": merged, "source": source_used}
+        ok_count += 1
+        latest = merged[0]
+        log(f"  ✓ {len(incoming)} 条（{source_used}），合并后 {len(merged)} 条，最新 {latest['issue']} {latest.get('date', '')}")
 
     if not games:
         log("!! 所有数据源均失败，保持原文件不变")
@@ -263,6 +463,7 @@ def main() -> int:
         "sources": {
             "cwl": "https://www.cwl.gov.cn/",
             "sporttery": "https://www.sporttery.cn/",
+            "500": "https://datachart.500.com/",
         },
         "errors": errors,
         "games": games,
