@@ -3,6 +3,7 @@
   "use strict";
 
   var E = window.LotteryEngine;
+  var ENS = window.LotteryEnsemble;
   var GAMES = E.GAMES;
   var ORDER = E.GAME_ORDER;
 
@@ -167,7 +168,8 @@
     var stale = !cur || force || cur.window !== state.window || cur.latest !== latest ||
       (Date.now() - cur.generatedAt > RECO_MS);
     if (stale) {
-      var result = E.recommend(gameId, draws, { window: state.window, sets: 2 });
+      if (!ENS || !ENS.recommend) throw new Error("集成推荐引擎未加载");
+      var result = ENS.recommend(gameId, draws, { window: state.window, sets: 2 });
       result.latest = latest;
       state.recos[gameId] = result;
     }
@@ -216,49 +218,162 @@
     return out;
   }
 
-  function recBallsHTML(gameId, set) {
+  function voteMapFromList(list) {
+    var map = {};
+    if (!list) return map;
+    for (var i = 0; i < list.length; i++) map[list[i].n] = list[i].votes;
+    return map;
+  }
+
+  function voteForPosition(reco, position, value) {
+    var p = reco.positions && reco.positions[position];
+    if (!p) return 0;
+    for (var i = 0; i < p.votes.length; i++) if (p.votes[i].n === value) return p.votes[i].votes;
+    return 0;
+  }
+
+  function ballWithVotesHTML(value, klass, votes, small, display) {
+    return '<span class="ball-wrap"><span class="ball ' + klass + (small ? " sm" : "") + '">' +
+      escapeHtml(display) + '</span><span class="vote-badge">' + votes + "票</span></span>";
+  }
+
+  function recBallsHTML(gameId, set, reco, mainMap, specialMap) {
     var game = gameMeta(gameId);
     if (game.kind === "digits") {
       return set.primary.map(function (d, i) {
-        return '<span class="ball ' + (gameId === "fc3d" ? "teal" : "purple") + '" style="animation-delay:' + (i * 26) + 'ms">' + d + "</span>";
+        return ballWithVotesHTML(d, gameId === "fc3d" ? "teal" : "purple", voteForPosition(reco, i, d), false, String(d));
       }).join("");
     }
     if (gameId === "kl8") {
-      return '<div class="balls grid-5">' + set.primary.map(function (n, i) {
-        return '<span class="ball pink" style="animation-delay:' + (i * 18) + 'ms">' + two(n) + "</span>";
+      return '<div class="balls grid-5">' + set.primary.map(function (n) {
+        return ballWithVotesHTML(n, "pink", mainMap[n] || 0, false, two(n));
       }).join("") + "</div>";
     }
-    var out = numberBallsHTML(gameId, set.primary, gameId === "dlt" ? "orange" : "red", false).replace(/animation-delay:(\d+)ms/g, function (m, d) {
-      return "animation-delay:" + (parseInt(d, 10) + 20) + "ms";
-    });
+    var out = set.primary.map(function (n) {
+      return ballWithVotesHTML(n, gameId === "dlt" ? "orange" : "red", mainMap[n] || 0, false, two(n));
+    }).join("");
     if (set.special && set.special.length) {
-      out += '<span class="plus">＋</span>' + numberBallsHTML(gameId, set.special, "blue", false);
+      out += '<span class="plus">＋</span>' + set.special.map(function (n) {
+        return ballWithVotesHTML(n, "blue", specialMap[n] || 0, false, two(n));
+      }).join("");
     }
     return out;
   }
 
-  function setText(gameId, set) {
+  function setText(gameId, set, label) {
     var game = gameMeta(gameId);
-    if (game.kind === "digits") return game.name + "：" + set.primary.join(" ");
-    var text = game.name + "：" + set.primary.map(two).join(" ");
+    var prefix = label ? label + " " : "";
+    if (game.kind === "digits") return prefix + game.name + "：" + set.primary.join(" ");
+    var text = prefix + game.name + "：" + set.primary.map(two).join(" ");
     if (set.special && set.special.length) text += " ＋ " + set.special.map(two).join(" ");
     return text;
   }
 
-  function copyButtonHTML(gameId, set) {
-    return '<button class="copy-btn" type="button" data-copy="' + escapeHtml(setText(gameId, set)) + '" aria-label="复制这注号码">' +
+  function copyButtonHTML(gameId, set, label) {
+    return '<button class="copy-btn" type="button" data-copy="' + escapeHtml(setText(gameId, set, label)) + '" aria-label="复制这注号码">' +
       '<svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><rect x="8" y="8" width="11" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M6 15V6a2 2 0 0 1 2-2h9" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>' +
       "</button>";
   }
 
   function recommendationHTML(gameId, reco) {
+    var mainMap = voteMapFromList(reco.mainVotes);
+    var specialMap = voteMapFromList(reco.specialVotes);
     return reco.sets.map(function (set, i) {
-      return '<div class="rec-set">' +
-        '<div class="rec-head"><span class="set-label">第 ' + (i + 1) + ' 注</span>' +
-        copyButtonHTML(gameId, set) + "</div>" +
-        '<div class="rec-balls">' + recBallsHTML(gameId, set) + "</div>" +
+      var isFinal = i === 0;
+      var label = set.label || (isFinal ? "最终一注" : "备选一注");
+      return '<div class="rec-set' + (isFinal ? " final" : "") + '">' +
+        '<div class="rec-head"><span class="set-label">' + escapeHtml(label) + "</span>" +
+        copyButtonHTML(gameId, set, label) + "</div>" +
+        '<div class="rec-balls">' + recBallsHTML(gameId, set, reco, mainMap, specialMap) + "</div>" +
+        '<div class="rec-meta">模型共识 <b>' + (set.voteSum || 0) + " 票</b>" +
+        (isFinal ? " · 票数最高的合法组合" : " · 与最终一注至少 2 个号码不同") + "</div>" +
         "</div>";
     }).join("");
+  }
+
+  function voteChipHTML(value, votes, max, selected, display) {
+    var pct = votes > 0 && max > 0 ? Math.max(4, Math.round(votes / max * 100)) : 0;
+    return '<div class="vote-chip' + (selected ? " selected" : "") + '">' +
+      '<span class="vote-num">' + escapeHtml(display) + "</span>" +
+      '<span class="vote-track"><i style="width:' + pct + '%"></i></span>' +
+      '<span class="vote-count">' + votes + "</span></div>";
+  }
+
+  function votePanelHTML(gameId, reco) {
+    var game = gameMeta(gameId);
+    var finalSet = reco.sets[0] || { primary: [], special: [] };
+    var html = '<section class="card vote-card">' +
+      '<div class="card-head"><div class="card-title"><span class="icon">◎</span>号码票数</div>' +
+      '<span class="badge">' + reco.modelCount + " 模型 · 每人 " + reco.voteK + " 票</span></div>" +
+      '<p class="hint-text">每个公式模型给最看好的 ' + reco.voteK + ' 个号码各投 1 票；票数越高，表示越多模型看好。</p>';
+
+    if (game.kind === "digits") {
+      html += reco.positions.map(function (p) {
+        var max = 1;
+        for (var i = 0; i < p.votes.length; i++) if (p.votes[i].votes > max) max = p.votes[i].votes;
+        var sorted = p.votes.slice().sort(function (a, b) { return a.n - b.n; });
+        return '<div class="vote-subtitle">' + escapeHtml(p.name) + "</div>" +
+          '<div class="vote-grid">' + sorted.map(function (x) {
+            return voteChipHTML(x.n, x.votes, max, finalSet.primary[p.index] === x.n, String(x.n));
+          }).join("") + "</div>";
+      }).join("");
+    } else {
+      var maxMain = 1;
+      for (var m = 0; m < reco.mainVotes.length; m++) if (reco.mainVotes[m].votes > maxMain) maxMain = reco.mainVotes[m].votes;
+      html += '<div class="vote-subtitle">' + escapeHtml(game.mainLabel) + "（" + reco.mainVotes.length + " 个号码）</div>" +
+        '<div class="vote-grid">' + reco.mainVotes.map(function (x) {
+          return voteChipHTML(x.n, x.votes, maxMain, finalSet.primary.indexOf(x.n) >= 0, two(x.n));
+        }).join("") + "</div>";
+      if (reco.specialVotes.length) {
+        var maxSpecial = 1;
+        for (var s = 0; s < reco.specialVotes.length; s++) if (reco.specialVotes[s].votes > maxSpecial) maxSpecial = reco.specialVotes[s].votes;
+        html += '<div class="vote-subtitle">' + escapeHtml(game.specialLabel) + "</div>" +
+          '<div class="vote-grid">' + reco.specialVotes.map(function (x) {
+            return voteChipHTML(x.n, x.votes, maxSpecial, finalSet.special.indexOf(x.n) >= 0, two(x.n));
+          }).join("") + "</div>";
+      }
+    }
+    return html + "</section>";
+  }
+
+  function pad2(n) { return n < 10 ? "0" + n : String(n); }
+
+  function modelRowHTML(gameId, m, idx) {
+    var game = gameMeta(gameId);
+    var top;
+    if (game.kind === "digits") {
+      top = m.topByPosition.map(function (arr, p) {
+        return escapeHtml(game.positions[p]) + " " + arr.map(String).join("/");
+      }).join(" · ");
+    } else {
+      top = "主区 " + m.top.map(two).join(" ");
+      if (m.specialTop && m.specialTop.length) {
+        top += " · " + escapeHtml(game.specialLabel) + " " + m.specialTop.map(two).join(" ");
+      }
+    }
+    return '<div class="model-row">' +
+      '<div class="model-line"><span class="model-name">' + pad2(idx) + " " + escapeHtml(m.name) + '</span><span class="model-vote">1 票</span></div>' +
+      '<div class="model-formula">' + escapeHtml(m.formula) + "</div>" +
+      '<div class="model-top">看好：<b>' + top + "</b></div></div>";
+  }
+
+  function modelsPanelHTML(gameId, reco) {
+    var groups = {}, order = [];
+    reco.models.forEach(function (m, i) {
+      if (!groups[m.category]) { groups[m.category] = []; order.push(m.category); }
+      groups[m.category].push({ m: m, idx: i + 1 });
+    });
+    var body = order.map(function (cat, ci) {
+      var rows = groups[cat].map(function (x) { return modelRowHTML(gameId, x.m, x.idx); }).join("");
+      return '<details class="model-category"' + (ci === 0 ? " open" : "") + "><summary>" +
+        escapeHtml(cat) + "（" + groups[cat].length + "）</summary>" + rows + "</details>";
+    }).join("");
+    return '<section class="card models-card">' +
+      '<div class="card-head"><div class="card-title"><span class="icon">∑</span>公式模型</div>' +
+      '<span class="badge">' + reco.modelCount + " 个</span></div>" +
+      '<p class="hint-text">共 ' + reco.modelCount + " 个公式模型，等权投票；每个模型给前 " + reco.voteK +
+      " 名各投 1 票。点开分类查看公式和当前看好的号码。</p>" +
+      '<div class="models-scroll">' + body + "</div></section>";
   }
 
   function statChips(list, cls, unitLabel) {
@@ -316,12 +431,13 @@
   }
 
   function aboutHTML() {
+    var modelCount = ENS && ENS.MODELS ? ENS.MODELS.length : 60;
     return '<section class="card about-card">' +
-      '<div class="card-head"><div class="card-title"><span class="icon">ⓘ</span>关于与说明</div><span class="badge gray">v1.0.0</span></div>' +
+      '<div class="card-head"><div class="card-title"><span class="icon">ⓘ</span>关于与说明</div><span class="badge gray">v1.1.0</span></div>' +
       '<ul class="about-list">' +
-      '<li><span class="bullet">↻</span><div><b>自动刷新</b>：打开页面后每 60 秒检查一次开奖数据，开奖后自动更新；推荐号码每 5 分钟自动换一注。</div></li>' +
+      '<li><span class="bullet">↻</span><div><b>自动刷新</b>：打开页面后每 60 秒检查一次开奖数据，开奖后自动更新；推荐号码每 5 分钟自动重新投票。</div></li>' +
       '<li><span class="bullet">↗</span><div><b>数据来源</b>：<a href="https://www.cwl.gov.cn/" target="_blank" rel="noopener">中国福利彩票</a>、<a href="https://www.sporttery.cn/" target="_blank" rel="noopener">中国体育彩票</a>官方公开接口；海外 Runner 自动回退到 500.com 公开历史页。GitHub Actions 每 10 分钟同步。</div></li>' +
-      '<li><span class="bullet">∑</span><div><b>推荐算法</b>：统计近 30 / 100 期号码频率与近期热度并加入随机扰动，同时约束奇偶、大小、区间和和值形态。任何模型都不能预测开奖结果。</div></li>' +
+      '<li><span class="bullet">∑</span><div><b>推荐算法</b>：' + modelCount + ' 个公式模型（频率/贝叶斯、遗漏/生存、转移/关联、形态/组合、时间序列、分布/优化）分别评分，并给最看好的前 3 名各投 1 票；汇总票数后按票数选号，再做奇偶、区间、和值、连号约束。票数越高表示越多模型看好，但任何模型都不能预测开奖结果。</div></li>' +
       '<li><span class="bullet">＋</span><div><b>装到桌面</b>：iPhone 用 Safari 打开 → 点底部「分享」→「添加到主屏幕」，即可全屏使用并支持离线缓存。</div></li>' +
       "</ul>" +
       '<div class="disclaimer">理性购彩，量力而行。未满 18 周岁禁止购买彩票。本应用仅提供公开开奖信息与娱乐性号码生成，不提供购彩、代购或兑奖服务。</div>' +
@@ -388,14 +504,17 @@
       "</section>" +
 
       '<section class="card">' +
-      '<div class="card-head"><div class="card-title"><span class="icon">✦</span>智能推荐</div>' +
-      '<span class="badge">近 ' + state.window + " 期</span></div>" +
+      '<div class="card-head"><div class="card-title"><span class="icon">✦</span>公式集成推荐</div>' +
+      '<span class="badge">' + reco.modelCount + ' 公式 · 近 ' + state.window + " 期</span></div>" +
       recommendationHTML(gameId, reco) +
       '<div class="rec-foot">' +
-      '<button class="btn btn-primary" type="button" data-action="reshuffle">换一注</button>' +
-      '<div class="auto-line" data-auto-line><span class="dot"></span><span>每 5 分钟自动换号<br><span data-reco-countdown>05:00</span> 后更新</span></div>' +
+      '<button class="btn btn-primary" type="button" data-action="reshuffle">重新投票</button>' +
+      '<div class="auto-line" data-auto-line><span class="dot"></span><span>每 5 分钟重新投票<br><span data-reco-countdown>05:00</span> 后更新</span></div>' +
       "</div>" +
       "</section>" +
+
+      votePanelHTML(gameId, reco) +
+      modelsPanelHTML(gameId, reco) +
 
       '<section class="card">' +
       '<div class="card-head"><div class="card-title"><span class="icon">◎</span>冷热统计</div>' +
@@ -501,6 +620,9 @@
       ensureReco(id);
       render();
       window.scrollTo({ top: 0, behavior: "smooth" });
+      try {
+        btn.scrollIntoView({ behavior: "smooth", inline: "center", block: "nearest" });
+      } catch (e) { /* ignore */ }
     });
 
     dom.main.addEventListener("click", function (event) {
@@ -525,7 +647,7 @@
       if (action && action.getAttribute("data-action") === "reshuffle") {
         ensureReco(state.active, true);
         render();
-        toast("已换一注，仅供娱乐");
+        toast("已重新投票，仅供娱乐");
         return;
       }
       if (event.target.closest("[data-retry]")) {

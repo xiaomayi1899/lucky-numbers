@@ -1,5 +1,5 @@
 /* 数字彩助手 Service Worker：应用壳离线可用，开奖数据网络优先 */
-const VERSION = "2026.11.09.2";
+const VERSION = "2026.11.09.3";
 const SHELL_CACHE = `shell-${VERSION}`;
 const DATA_CACHE = `data-${VERSION}`;
 
@@ -8,6 +8,7 @@ const SHELL_ASSETS = [
   "./index.html",
   "./assets/style.css",
   "./assets/engine.js",
+  "./assets/ensemble.js",
   "./assets/app.js",
   "./manifest.webmanifest",
   "./icons/icon-32.png",
