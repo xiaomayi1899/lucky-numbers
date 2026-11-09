@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#080b14">
+<meta name="color-scheme" content="dark">
+<title>数字彩助手 · 开奖与智能推荐</title>
+<meta name="description" content="双色球、大乐透、福彩3D、排列5、快乐8 最新开奖、冷热统计与号码推荐。支持 iPhone 添加到主屏幕、自动刷新与离线查看。仅供娱乐，理性购彩。">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/icon-32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="icons/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="数字彩助手">
+<meta property="og:title" content="数字彩助手 · 开奖与智能推荐">
+<meta property="og:description" content="五种数字彩的开奖号码、冷热统计与智能推荐，自动刷新，离线可用。">
+<meta property="og:type" content="website">
+<link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<div class="bg-orb bg-orb-a" aria-hidden="true"></div>
+<div class="bg-orb bg-orb-b" aria-hidden="true"></div>
+
+<div id="app" class="app">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">彩</span>
+      <div class="brand-text">
+        <h1>数字彩助手</h1>
+        <p>开奖 · 推荐 · 自动刷新</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <span id="netDot" class="net-dot" aria-label="数据状态" title="数据状态"></span>
+      <button id="refreshBtn" class="icon-btn" type="button" aria-label="立即刷新">
+        <svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true"><path d="M20 11a8.1 8.1 0 0 0-15.5-2M4 4v5h5M4 13a8.1 8.1 0 0 0 15.5 2M20 20v-5h-5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <nav class="tabs" id="tabs" aria-label="彩种选择" role="tablist"></nav>
+
+  <main id="main" class="main">
+    <section class="card skeleton-card" aria-hidden="true">
+      <div class="sk sk-line w40"></div>
+      <div class="sk sk-balls"></div>
+      <div class="sk sk-line w80"></div>
+      <div class="sk sk-line w60"></div>
+    </section>
+  </main>
+
+  <footer class="footer">
+    <p>数据来自福彩 / 体彩官方公开接口 · 每 10 分钟自动同步</p>
+    <p>推荐号码由统计模型随机生成，仅供娱乐 · 理性购彩，未满 18 岁禁止购彩</p>
+    <p class="footer-version">v1.0.0 · <span id="swState">本地缓存准备中</span></p>
+  </footer>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div id="installHint" class="install-hint" hidden>
+  <div class="install-icon" aria-hidden="true">彩</div>
+  <div class="install-text">
+    <strong>装到主屏幕，像 App 一样用</strong>
+    <span>点 Safari 底部「分享」→「添加到主屏幕」，之后可全屏打开、断网也能看。</span>
+  </div>
+  <button id="installClose" class="install-close" type="button" aria-label="关闭提示">×</button>
+</div>
+
+<script src="assets/engine.js"></script>
+<script src="assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,65 @@
+name: 更新开奖数据并部署 Pages
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # 每 10 分钟检查一次；GitHub 定时任务可能有几分钟延迟
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  update-and-deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch latest lottery data
+        run: python scripts/fetch_data.py
+
+      - name: Commit data changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- data/lottery.json; then
+            echo "开奖数据无变化"
+          else
+            git add data/lottery.json
+            git commit -m "chore(data): refresh lottery draws [skip ci]"
+            git push
+          fi
+
+      - name: Prepare static site
+        run: |
+          mkdir -p _site
+          cp -R index.html manifest.webmanifest sw.js assets data icons .nojekyll _site/
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
