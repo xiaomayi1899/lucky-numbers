@@ -1,13 +1,16 @@
 {
  "version": 1,
- "updated": "2026-11-20T12:00:31+08:00",
+ "updated": "2026-11-20T20:35:22+08:00",
  "timezone": "Asia/Shanghai",
  "sources": {
   "cwl": "https://www.cwl.gov.cn/",
   "sporttery": "https://www.sporttery.cn/",
   "500": "https://datachart.500.com/"
  },
- "errors": [],
+ "errors": [
+  "ssq: official: 请求失败：https://www.cwl.gov.cn/cwl_admin/front/cwlkj/search/kjxx/findDrawNotice?name=ssq&issueCount=150&pageNo=1&pageSize=150 | 500: ssq: 500.com 备用源返回空数据",
+  "p5: official: 请求失败：https://webapi.sporttery.cn/gateway/lottery/getHistoryPageListV1.qry?gameNo=350133&provinceId=0&pageSize=100&isVerify=1&pageNo=1 | 500: p5: 500.com 备用源返回空数据"
+ ],
  "games": {
   "ssq": {
    "name": "双色球",
